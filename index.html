@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UCAT VR Practice - MedwithPurpose</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        /* Custom styles for better UI/UX */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent scrolling on body */
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* --- REDESIGNED THEMES --- */
+        .theme-background {
+            background-color: #f0f2f5;
+        }
+
+        #setup-screen, #results-screen {
+            background: linear-gradient(170deg, #c7d2fe 0%, #f0f2f5 50%, #b0bec5 100%);
+        }
+
+        .card {
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
+            border-radius: 1rem;
+        }
+
+        .primary-button-new {
+            background-image: linear-gradient(135deg, #4f46e5, #6366f1);
+            color: white;
+            border: none;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
+            font-weight: 600;
+            padding: 0.75rem 2rem;
+            border-radius: 0.5rem;
+        }
+        .primary-button-new:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+            background-image: linear-gradient(135deg, #4338ca, #4f46e5);
+        }
+
+        .secondary-button-new {
+            background-color: transparent;
+            color: #4353ff;
+            border: 1px solid #4353ff;
+            transition: all 0.3s ease;
+             font-weight: 600;
+            padding: 0.75rem 2rem;
+            border-radius: 0.5rem;
+        }
+        .secondary-button-new:hover {
+            background-color: rgba(67, 83, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        input.themed-input {
+            background-color: #f0f2f5;
+            border: 1px solid #d1d5db;
+            color: #1f2937;
+        }
+        input.themed-input:focus {
+            border-color: #4353ff;
+            box-shadow: 0 0 0 2px rgba(67, 83, 255, 0.2);
+            outline: none;
+        }
+
+        /* --- Original Test Environment Styles --- */
+        #app-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 2rem);
+            width: 100%;
+            background-color: #ffffff;
+            border: 1px solid #d1d5db;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 0.375rem;
+            margin: 1rem;
+            overflow: hidden;
+        }
+        .header-bar, .footer-bar {
+            flex-shrink: 0;
+            background-color: #006DAA;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-bar span, .header-bar div { color: white; }
+        #timer { background-color: rgba(255, 255, 255, 0.2); color: white; font-weight: bold; padding: 0.25rem 0.75rem; border-radius: 0.25rem; }
+        .footer-bar button, .font-size-button { background-color: transparent; color: white; border: 1px solid rgba(255, 255, 255, 0.5); padding: 0.4rem 0.8rem; font-size: 0.8rem; border-radius: 0.375rem; transition: background-color 0.2s ease, border-color 0.2s ease; }
+        .font-size-button { padding: 0.2rem 0.6rem; font-weight: bold; line-height: 1.25; }
+        .footer-bar button:hover:not(:disabled), .font-size-button:hover:not(:disabled) { background-color: rgba(255, 255, 255, 0.15); border-color: white; }
+        .footer-bar button:disabled { opacity: 0.5; cursor: not-allowed; border-color: rgba(255, 255, 255, 0.3); }
+        .footer-bar button#next-button { background-color: #ffffff; color: #006DAA; border: 1px solid white; font-weight: 500; }
+        .footer-bar button#next-button:hover:not(:disabled) { background-color: #f0f0f0; }
+        #flag-button { background-color: transparent; border: 1px solid white; color: white; transition: background-color 0.2s ease, color 0.2s ease; }
+        #flag-button:hover { background-color: white; color: #006DAA; }
+        #flag-button.flagged { background-color: #facc15; border-color: #facc15; color: #422006; }
+        #flag-button.flagged:hover { background-color: #f59e0b; border-color: #f59e0b; }
+
+        .main-content-area { flex-grow: 1; display: flex; overflow: hidden; padding: 1rem; gap: 1rem; }
+        
+        /* UPDATED: Column widths changed to 60/40 split */
+        .passage-column {
+            flex: 0 0 60%;
+            overflow-y: auto; padding: 1rem; border: 1px solid #e5e7eb; border-radius: 0.375rem; background-color: #ffffff; height: 100%; transition: font-size 0.2s ease;
+        }
+        .question-column {
+            flex: 0 0 40%;
+            overflow-y: auto; padding: 1rem; border: 1px solid #e5e7eb; border-radius: 0.375rem; background-color: #ffffff; height: 100%; transition: font-size 0.2s ease;
+            position: relative;
+        }
+
+        .selected-answer { background-color: #bfdbfe !important; border-color: #3b82f6 !important; }
+        .nav-answered { background-color: #a7f3d0; }
+        .nav-current { border: 2px solid #3b82f6 !important; font-weight: bold; }
+        .nav-flagged, .review-flagged { border: 2px solid #f59e0b !important; position: relative; }
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
+        .modal-content { background-color: #fefefe; margin: auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 600px; border-radius: 0.5rem; }
+        .modal.flex { display: flex; }
+
+        .option-label { display: block; padding: 0.75rem 1rem; border: 1px solid #d1d5db; border-radius: 0.375rem; margin-bottom: 0.5rem; cursor: pointer; transition: background-color 0.2s ease, border-color 0.2s ease; background-color: #ffffff; color: #111827; }
+        .option-label:hover:not(.selected-answer) { background-color: #f3f4f6; border-color: #a5b4fc; }
+        input[type="radio"] { display: none; }
+        .resizable-text { font-size: 1rem; }
+
+        .explanation-box { background-color: #f3f4f6; border: 1px solid #d1d5db; padding: 0.5rem 0.75rem; margin-top: 0.75rem; border-radius: 0.375rem; color: #111827; }
+
+        .review-grid-button { padding: 0.5rem 0.25rem; border: 1px solid #d1d5db; border-radius: 0.375rem; text-align: center; transition: background-color 0.2s ease, border-color 0.2s ease; font-size: 0.875rem; line-height: 1.25rem; cursor: pointer; }
+        .review-grid-button-answered { background-color: #dcfce7; border-color: #86efac; color: #15803d; }
+        .review-grid-button-unanswered { background-color: #f3f4f6; border-color: #d1d5db; color: #4b5563; }
+        .review-grid-button:hover { filter: brightness(95%); }
+
+        /* Results Screen Grid */
+        #results-grid-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 0.75rem; padding: 1rem 0; width: 100%; }
+        .result-box { display: flex; flex-direction: column; align-items: center; justify-content: center; aspect-ratio: 1 / 1; padding: 0.25rem; border-radius: 0.5rem; color: white; text-align: center; cursor: pointer; transition: transform 0.2s ease, box-shadow 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 100%; height: auto; border: none; }
+        .result-box:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+        
+        .result-box-correct {
+            background: linear-gradient(145deg, #22c55e, #15803d);
+        }
+        .result-box-incorrect {
+            background: linear-gradient(145deg, #ef4444, #b91c1c);
+        }
+        .result-box-flagged { outline: 3px solid #f59e0b; outline-offset: 2px; }
+        .result-box .time-spent { font-size: 1rem; font-weight: 600; line-height: 1.1; }
+        .question-num-label { font-size: 0.75rem; color: #4b5563; text-align: center; width: 100%; margin-top: 0.25rem; }
+
+        @media (max-width: 768px) {
+            #app-container { height: auto; margin: 0.5rem; }
+            .main-content-area { flex-direction: column; padding: 0.5rem; gap: 0.5rem; }
+            .passage-column, .question-column { flex-basis: auto; width: 100%; } /* Reverts to block-level stacking on mobile */
+            .header-bar, .footer-bar { padding: 0.5rem 1rem; }
+            .header-bar span, .footer-bar button, .font-size-button { font-size: 0.8rem; }
+            #review-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    </head>
+<body class="theme-background">
+
+    <div id="app-container" class="!border-none !shadow-none !m-0 !rounded-none">
+
+        <div id="setup-screen" class="p-4 md:p-8 flex flex-col justify-center items-center h-full w-full">
+            <div class="w-full max-w-lg text-center">
+                <img src="https://ik.imagekit.io/mwp/MWP%20Color%20no%20background.png?updatedAt=1745982959141"
+                     alt="MedwithPurpose Logo"
+                     class="mx-auto h-24 w-auto mb-6"
+                     onerror="this.style.display='none'; this.onerror=null;">
+                <div class="card p-8 md:p-10">
+                    <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Verbal Reasoning Practice</h1>
+                    <p class="text-gray-600 mt-2 text-lg mb-8">Sharpen your skills for the UCAT VR section.</p>
+                    <div class="text-left space-y-3 mb-8 bg-blue-50/50 border border-blue-200/50 rounded-lg p-4">
+                        <p class="text-sm text-gray-800"><strong class="font-semibold">Questions:</strong> <span id="setup-question-count">44</span></p>
+                        <p class="text-sm text-gray-800"><strong class="font-semibold">Time Limit:</strong> <span id="setup-time-limit">22 minutes</span></p>
+                    </div>
+
+                    <div class="space-y-6 text-left">
+                        <div>
+                            <label for="name" class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                            <input type="text" id="name" name="name" class="themed-input mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Enter your name">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="goal" class="block text-sm font-medium text-gray-700 mb-1">Score Goal</label>
+                                <input type="number" id="goal" name="goal" min="0" max="44" class="themed-input mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none sm:text-sm" placeholder="e.g., 35">
+                            </div>
+                            <div>
+                                <label for="focus-area" class="block text-sm font-medium text-gray-700 mb-1">Practice Intention</label>
+                                <input type="text" id="focus-area" name="focus-area" class="themed-input mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none sm:text-sm" placeholder="e.g., Speed, Accuracy">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-10">
+                        <button id="start-button" class="primary-button-new w-full text-lg">
+                            Start Exam
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div id="exam-screen" class="hidden flex flex-col h-full">
+            <div class="header-bar">
+                <span id="exam-title" class="font-semibold">Verbal Reasoning</span>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <button id="font-decrease-button" class="font-size-button">A-</button>
+                        <button id="font-increase-button" class="font-size-button">A+</button>
+                    </div>
+                    <div id="timer" class="text-base px-3 py-1 rounded-md">22:00</div>
+                    <span class="text-sm">Question <span id="question-number-info">1</span> of 44</span>
+                    <button id="flag-button" class="text-sm font-medium border border-white rounded px-2 py-1 transition-colors duration-150">
+                         Flag for Review
+                    </button>
+                </div>
+            </div>
+            <div class="main-content-area">
+                <div class="passage-column resizable-text">
+                    <h3 class="text-lg font-semibold mb-2 sticky top-0 bg-white text-gray-900 pb-1">Passage <span id="passage-number">1</span></h3>
+                    <div id="passage-text" class="text-base text-gray-900 leading-relaxed whitespace-pre-wrap"></div>
+                </div>
+                <div class="question-column resizable-text">
+                     <h4 class="text-md font-semibold mb-3 sticky top-0 bg-white text-gray-900 pb-1">Question <span id="question-number">1</span></h4>
+                    <p id="question-text" class="mb-4 text-gray-900"></p>
+                    <div id="options-container" class="space-y-2"></div>
+                    <div id="review-explanation-container"></div>
+                </div>
+            </div>
+            <div class="footer-bar">
+                <button id="back-to-results-button" class="hidden mr-auto">← Back to Results</button>
+                <button id="end-exam-button-footer">End Exam</button>
+                <div class="flex items-center space-x-2 ml-auto">
+                    <button id="prev-button" disabled>← Previous (Alt+P)</button>
+                    <button id="navigator-button">Navigator</button>
+                    <button id="next-button">Next (Alt+N) →</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="review-screen" class="hidden p-6 md:p-8 flex-col items-center h-full overflow-y-auto bg-gray-50">
+             <div class="w-full max-w-3xl mb-4 flex justify-between items-center">
+                 <h2 class="text-2xl font-bold text-gray-900">Review Your Answers</h2> <button id="filter-flagged-button" class="bg-white border border-gray-300 text-gray-700 px-3 py-1 rounded-md text-sm hover:bg-gray-100">Show Flagged Only</button>
+            </div>
+             <p class="text-center text-gray-600 mb-6">Click on a question number to review it. Green indicates answered, Yellow border indicates flagged.</p>
+             <div id="review-grid" class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-8 lg:grid-cols-11 gap-3 mb-6 w-full max-w-4xl"></div>
+            <div class="mt-auto pt-6">
+                <button id="end-exam-button" class="bg-red-600 text-white hover:bg-red-700 text-lg px-8 py-3 rounded-md">
+                    End Exam & See Results
+                </button>
+            </div>
+        </div>
+
+
+        <div id="results-screen" class="hidden p-4 md:p-8 flex-col h-full overflow-y-auto w-full">
+            <div class="w-full max-w-4xl mx-auto">
+                <div class="text-center mb-8">
+                    <h2 class="text-3xl md:text-4xl font-bold text-gray-900">Exam Results</h2>
+                    <p class="text-gray-600 mt-2">Here's a breakdown of your performance.</p>
+                </div>
+
+                <div class="card p-8 mb-8 text-center">
+                    <p class="text-lg text-gray-600 mb-2">Your Score</p>
+                    <p class="text-6xl font-bold text-gray-900"><span id="score">0</span><span class="text-4xl text-gray-500"> / <span id="total-questions-results">44</span></span></p>
+                    <div class="mt-4 h-1 w-24 bg-indigo-200 mx-auto rounded-full"></div>
+                    <p class="mt-4 text-md text-gray-500">Time Taken: <span id="time-taken" class="font-semibold"></span></p>
+                </div>
+
+                <div class="grid md:grid-cols-5 gap-8 mb-8">
+                    <div class="md:col-span-2 space-y-8">
+                        <div class="card p-6">
+                            <h4 class="text-lg font-semibold mb-3 text-center text-gray-800">Time Analysis</h4>
+                            <div id="time-analysis-results" class="space-y-2 text-sm text-gray-600"></div>
+                        </div>
+                        <div class="card p-6">
+                            <h4 class="text-lg font-semibold mb-3 text-center text-gray-800">Performance by Type</h4>
+                            <div id="type-analysis-results" class="space-y-2 text-sm text-gray-600"></div>
+                        </div>
+                    </div>
+                    <div class="md:col-span-3 card p-6">
+                       <h3 class="text-lg font-semibold mb-1 text-gray-800">Detailed Results</h3>
+                         <p class="text-sm text-gray-500 mb-4">Click a box to review the question.</p>
+                       <div id="results-grid-container"></div>
+                    </div>
+                </div>
+
+                <div class="card p-8 mb-8">
+                    <h3 class="text-xl font-semibold mb-6 text-gray-800">Reflection</h3>
+                    <div class="space-y-6">
+                        <div>
+                            <label for="reflection-q1" class="block text-md font-semibold text-gray-700 mb-2">Which question type was most challenging, and why?</label>
+                            <textarea id="reflection-q1" rows="3" class="themed-input block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm sm:text-sm" placeholder="e.g., Inference questions were tricky because..."></textarea>
+                        </div>
+                        <div>
+                            <label for="reflection-q2" class="block text-md font-semibold text-gray-700 mb-2">Which question took you the longest, and why?</label>
+                            <textarea id="reflection-q2" rows="3" class="themed-input block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm sm:text-sm" placeholder="e.g., Question 7 took a while because I had to re-read the passage..."></textarea>
+                        </div>
+                        <div>
+                            <label for="reflection-q3" class="block text-md font-semibold text-gray-700 mb-2">Did you stick to your 'Practice Intention'? If not, what distracted you?</label>
+                            <textarea id="reflection-q3" rows="3" class="themed-input block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm sm:text-sm" placeholder="I wanted to focus on speed, but got bogged down in the details..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center flex justify-center items-center space-x-4">
+                    <button onclick="window.location.reload()" class="secondary-button-new">
+                        Try Again
+                    </button>
+                    <button id="download-pdf-button" class="primary-button-new">
+                        Download Results PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+        <div id="navigator-modal" class="modal">
+            <div class="modal-content bg-white p-6 rounded-lg shadow-xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-900">Question Navigator</h3> <button id="close-modal-button" class="text-gray-500 hover:text-gray-700 text-2xl font-bold">&times;</button>
+                </div>
+                 <p class="text-sm text-gray-600 mb-4">Click a number to jump. Green: answered, Yellow border: flagged.</p>
+                 <div id="navigator-grid" class="grid grid-cols-5 gap-3"></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Data & State ---
+        const passages = [
+            `From simulating molecular interactions at unprecedented scales to revolutionizing drug design methodologies, quantum computing represents a fundamental transformation in pharmaceutical research.\nThese exotic machines, operating on principles of superposition and entanglement, can model complex protein folding patterns that would require classical supercomputers millennia to calculate.\nOf particular significance to pharmaceutical companies are quantum algorithms for molecular dynamics simulations, which predict drug-target interactions with accuracy rates approaching 95% for certain protein classes, results previously unattainable through conventional computational chemistry.\nThe mechanisms enabling this computational advantage involve quantum parallelism-qubits existing in multiple states simultaneously, exploring vast solution spaces, and identifying optimal molecular configurations through quantum interference patterns.\nTwo pivotal factors influence quantum drug discovery success: coherence time maintenance, which determines how long quantum states remain stable for calculation, and error correction protocols, which compensate for quantum decoherence effects.\nThese requirements demand sophisticated infrastructure including dilution refrigerators operating near absolute zero and electromagnetic shielding to prevent environmental interference.\nCurrent implementations utilize variational quantum eigensolvers and quantum approximate optimization algorithms to characterize molecular energy landscapes comprehensively.\nRecent breakthroughs have extended quantum applications beyond small molecule analysis to protein-protein interactions, enzyme catalysis modeling, and even personalized medicine approaches.\nThe developing field of "quantum pharmacology" investigates how quantum effects in biological systems influence drug efficacy through tunneling phenomena, coherent energy transfer, and quantum entanglement in neural microtubules.\nBy leveraging quantum computational resources through hybrid classical-quantum algorithms, researchers can potentially accelerate drug development timelines from decades to years, though standardized validation frameworks remain under construction as scientists work to establish reproducibility standards, quality control metrics, and regulatory compliance pathways.`,
+            `Urban coyote populations nearly tripled between 2018 and 2024, compared with the 2012 to 2017 average, according to a new wildlife survey.\nInstallation of wildlife corridors connecting fragmented habitats doubled during the first 3 years of Dr. Rodriguez's tenure as city planning director.\nThe survey found that the recent population increase had little connection with traditional conservation efforts, but resulted from animals' rapid behavioral adaptation to human-dominated landscapes.\nUnder Rodriguez's leadership, documented human-wildlife conflicts involving property damage decreased significantly.\nThe analysis warns that residents unfamiliar with wildlife behavior have become a contributing factor in dangerous encounters, particularly in newly developed suburban areas.\nThis population, which represents an expanding segment of urban dwellers, is experiencing unprecedented proximity to apex predators.\nThis will have important implications for urban planning and public safety.\nTechnology companies in Silicon Valley are developing Al-powered wildlife tracking systems.\nThis is an intriguing development, not only for conservation science but for urban management.\nThe field of urban ecology is experiencing rapid evolution. The second phase of Rodriguez's urban wildlife program introduced even more innovative monitoring technologies and community engagement strategies.\nThere is growing concern about wildlife disease transmission, but a prominent urban ecologist suggested there was an opportunity to create sustainable coexistence models.\n"I can envision integrated ecosystems developing throughout metropolitan areas." Several cities recorded measurable improvements in biodiversity indices by late 2024. This would be highly beneficial.\nThe new mayor, Dr. Chen, has committed to expanding green infrastructure by 2026. She organized a wildlife management conference recently, but they failed to address liability issues for wildlife-related injuries.`,
+            `Recent research indicates that approximately 23% of coral species demonstrate active pH regulation capabilities, which is up from 11% documented in 2015. The observed increase is believed to result from accelerated evolutionary pressure, which triggers genetic expression changes during prolonged acidification exposure.\nAdditional contributing mechanisms are thought to involve symbiotic zooxanthellae adaptations within coral tissues and potential epigenetic modifications affecting calcification pathways in reef-building species.\nOver the past 15 years, the Acropora palmata population has experienced intermittent recovery phases of 60%, while the Diploria labyrinthiformis population has shown consistent growth over the last 5 years.\nThese patterns have shifted markedly. Resilient species including Porites astreoides and Siderastrea siderea are expanding rapidly, with populations having increased by two-thirds in recent decades.\nThe abundance of Montastraea cavernosa has increased by more than 70% and continues expanding.\nThe distribution of Orbicella faveolata has also transformed, with a growth of one-half in less than 20 years, reaching an estimated twelve percent coverage.\nTo enhance coral resilience and facilitate adaptation, marine biologists are advised to implement assisted evolution protocols and establish genetic diversity reserves.\nMost experimental frameworks utilize controlled breeding programs though some employ direct genetic manipulation techniques, particularly CRISPR-based modifications.\nThese are favored by parrotfish species, whose grazing patterns have shifted by 42% since 2015. Genetic intervention protocols have been demonstrated to improve thermal tolerance throughout the reproductive cycle-a critical factor for long-term survival.\nNevertheless, not all reef inhabitants are experiencing population growth. Since 2015, the abundance of staghorn coral has decreased, macroalgae coverage has tripled and the crown-of-thorns starfish population is expanding at the rate of 380%.\nCould these competitive pressures have influenced the adaptive responses of surviving coral species?`,
+            `There was no standardized cataloging system in European monasteries until 1347. The catalog recorded all manuscripts, their scribes' names, materials used and storage locations as well as illuminations, bindings and acquisition dates.\nHowever, personal libraries, such as those maintained by wealthy merchants, also preserve valuable information about literacy rates and book ownership patterns.\nIn 1298 when Abbot Theodoric III needed funding, instead of selling precious metals that nobles could claim through feudal rights, his advisor Brother Marcus suggested a fee on manuscript copying services provided by monastic scriptoriums.\nDespite the considerable resistance generated by requiring payment for religious text reproduction, this became the Scriptorium Fee to be collected by monastic orders (or cathedral schools if orders lacked copying facilities).\nManuscript collections were inventoried because there could certainly be more valuable texts than reported holdings.\nMonastic libraries were exempt if they were too poor to maintain scribes, possessed fewer than 50 volumes and produced copies worth less than 5 shillings per month.\nTo examine Scriptorium Fee records regarding manuscript production, we must investigate individual monastery accounts and, particularly in the early decades, the registers of texts commissioned under secular patronage.\nSuch documentation is essential for understanding medieval literacy.\nInitially the fee was administered by abbots, then by "chancellors", then by "librarians" and finally by merchant guilds who in 1384, collected a record 2,400 shillings.\nAlthough Scriptorium Fee records are now housed in the Vatican Archives, they were originally stored in monasteries and 150 chests of documents were relocated multiple times, with many records being damaged by moisture or rodents.\nAt least partial records for 23 monasteries have been transcribed so far, with the remainder still pending.`,
+            `It is part of scientific culture to acknowledge that, given favorable circumstances, unexpected observations can yield transformative discoveries.\nResearch is replete with dedicated investigators from diverse backgrounds who through attentiveness, flexibility and perception, transform accidents into revolutionary innovations.\nWilhelm Röntgen, a German physics professor, stumbled upon X-rays while investigating cathode rays.\nHis observation was that "invisible rays penetrated opaque materials". Alexander Fleming, one of Britain's foremost bacteriologists, made his discovery through contamination.\nHe will forever be associated with recognizing penicillin's antibacterial properties.\nTechnology provides numerous comparable instances. The creation of Post-it Notes by Spencer Silver is rooted in failed experimentation.\nMicrowave ovens are perhaps the most familiar "accident to application" narrative. They have revolutionized food preparation across the globe.\nThey have transformed cooking methods, dining habits, workplace efficiency, and domestic routines.\nA Raytheon engineer's serendipitous discovery begins "Percy Spencer noticed chocolate melting near magnetron equipment, realized its heating potential".\nWe are typically most acquainted with one of the popularized accounts of the innovation that was publicized in 1946 by Raytheon Corporation, Percy Spencer.\nHe exemplified an enduring principle that has been documented in the laboratory notebooks of Boston, London, and Tokyo.\nOver 500 accounts of accidental discoveries exist in various scientific archives. Specifics may differ, but the fundamental pattern persists.\nIt demonstrates that keen observation combined with open-minded investigation, that flexible thinking will transcend expectations, and that individual insight need not preclude commercial success.\nThe microwave story's attraction is that it provides practical benefits.\nHowever sophisticated the technology may appear, consumers can experience convenience immediately.`,
+            `CRISPR's neurological application 'synaptic editing' may possess the capacity to modify neurotransmitter receptors, regulate synaptic plasticity and alter neural circuit configurations in adult brains, but its scope of effectiveness is constrained to neurons accessible via current delivery methods and the precision of its targeting mechanisms.\nTo successfully treat neurodegenerative conditions or psychiatric disorders affecting distributed brain networks and achieve therapeutic modifications across entire neural populations, a more comprehensive strategy is being explored by the International Neuroscience Consortium.\nThe utilization of engineered adeno-associated viruses to transport and express therapeutic genes might appear merely as sophisticated viral infection, but authorization has been granted to evaluate the feasibility of three 'neural editor' platforms capable of addressing protein aggregation, synaptic dysfunction and neuroinflammatory processes.\nThe initial experimental approach incorporates two modified enzymes whose combined 'molecular switches' activate genes within their specified neural targets.\nBy modulating or suppressing one of the enzymes' catalytic sites, expression patterns can be adjusted throughout the affected neural networks.\nThis synaptic editor platform has undergone preclinical testing, but the requirement for blood-brain barrier penetration represents a significant limitation.\nThe second methodology avoids this restriction as it employs lipid nanoparticles engineered with transferrin receptors.\nThis type of neural-editing platform has demonstrated ability to traverse endothelial barriers across the entire central nervous system, and is optimal for targeting non-replicating neurons and glial cells.\nThe final approach remains largely conceptual, depending on the application of optogenetic controllers.\nUnlike conventional CRISPR-derived tools, optogenetic editors establish a network of light-sensitive channels that, theoretically, could inhibit or, remarkably, enhance neural activity through photostimulation patterns created at their insertion points.`,
+            `Since I discovered Upernavik Research Station 12 years ago, I return there, as to a sanctuary, whenever I can.\nIt is a functioning 2008 climate monitoring facility set on 30 hectares of tundra, established almost 100 years after Peary's expedition.\nApproached through frozen fjords, Upernavik is first glimpsed as the dome emerges above ice ridges.\nSeen through Arctic twilight, it appears like a beacon of science but close up, funding limitations mark this once prestigious institution.\nThe vistas are spectacular. On one side, the glacier face plunging to the ocean floor is dramatically exposed to view so that the calving icebergs are visually 'captured'.\nOn the other side, the Greenland Ice Sheet, extending beyond wind-sculpted formations, is observed continuously through gaps in the coastal mountains.\nUpernavik was the northernmost climate facility in the Western Hemisphere.\nIn the 2010s, James Hansen, pioneer of climate modeling, praised the unparalleled data quality of its polar location.\nThe most valuable research occurs directly beneath the facility. Separated from the buildings by an 'isolation layer', precisely drilled boreholes extend deeply into the permafrost.\nStrategically positioned sensors monitor the ice. Unlike other polar observatories, Upernavik has no need for satellite relays since the facility, positioned high on its promontory above the magnetic interference, maintains direct communication despite the aurora below.\nUpernavik is experiencing financial difficulties. So what future awaits its measurements, research and contributions?\nFor how much longer can we monitor-to document, to understand and to be warned?`,
+            `Letters of credit were standard for 15th century Italian merchant families.\nBanking houses believed that trust should have everything to do with the fundamental matter of commercial exchange since it would facilitate international trade networks.\nThey recognized that young merchants required the expertise and connections to establish creditworthy reputations across multiple trading centers.\nBankers were typically chosen from among established families and partnerships since few could manage to support extensive correspondence networks for extended periods.\nMedici agents might pursue introductions and associations to identify reliable correspondents.\nPeriodically, until the practice was formalized in 1472, some utilized informal lending arrangements.\nAfter 1472, the majority of the new Banking Guild regulations, enforced by commercial courts from all major Italian cities, mandated written contracts documenting terms.\nThese instruments soon came to be regarded as 'commercial foundations'.\nOnce a merchant was vetted, a credit arrangement was structured.\nComplex and often delicate negotiations involved bankers and traders but sometimes included the civic authorities.\nThe banker's house sought to obtain a considerable deposit or 'security'.\nThe term of the credit was typically determined as a function of the voyage's duration.\nThe merchant's associates required the banker guarantee payment settlement for their goods during the journey, with an assured 'return' to compensate them as established traders.\nSecurities were commonly calculated as a percentage of the cargo value at a ratio of 1:10.\nNegotiations, which frequently required 2 months, produced a legally enforceable credit instrument. The commercial transaction would proceed shortly thereafter.\nCredit arrangements occasionally defaulted and the young merchant sometimes abandoned the designated route.`,
+            `Antarctica is 14,000 kilometers from Chile's research headquarters. Its scientists had been collaborating internationally since the Antarctic Treaty and had established their own research protocols.\nUntil environmental restrictions were strengthened in 2012, the continent had supported diverse research programs despite geographic isolation and extreme conditions.\nLogistics were demanding, and fuel supplies increasingly regulated. Researchers discovered they had inadvertently impacted local ecosystems, contaminating ice cores with diesel exhaust, which made pristine sampling impossible and compromised them scientifically.\nWhen the last uncontaminated sites were identified, sampling equipment had to be redesigned until a clean technology program was established.\nAlthough it currently hosts a limited permanent presence, Antarctica is inhabited year-round by those temporarily conducting glaciological studies (initiated in 1998), and by climatologists, biologists, geologists, atmospheric scientists, marine ecologists undertaking critical research, and support staff.\nThey rely on shipments from multiple nations for food, construction materials, communications and research equipment.\nThere is also a network of airstrips and several research vessels.\nThis supports the work of scientific institutions and accommodates approximately 5,000 researchers annually.\nTechnology can now substantially address the challenges that threatened Antarctica's research viability 30 years ago.\nIt appears only a question of time before the continent's scientific community expands at least moderately its capacity, particularly if sustainable practices are permitted to develop there.\nIn 2005, the Antarctic Environmental Protocol, managed by the treaty nations' committee (ATCM) established stringent protection standards in acknowledgment of its unique ecosystems, its invaluable climate records and its pristine research environment.\nMore recently, Antarctica's ice core archives have become the researchers' primary concern, promoting preservation of an irreplaceable climate record now threatened.\nAll of this could be compromised if research expansion is permitted unchecked.`,
+            `One of the phenomena of the northern forests is the silent hunt-when owls strike without warning in darkness.\nWe may witness hunting more during winter because prey becomes more visible against snow. But why do they hunt then?\nThere are different explanations for different owl species.\nMany owls maintain a hunting territory within their forest range.\nThe dominant female hooting rhythmically in the canopy is announcing the pair's ownership, warning rival owls, and communicating hunting intentions.\nShe is preparing to detect, pursue and capture prey to sustain the breeding pair.\nTo guarantee the survival of her offspring, she and her mate must effectively control a territory containing sufficient prey primarily voles and mice.\nWhen prey is plentiful, the territory can be more compact than in scarce years.\nMale and female owls have different plumage patterns, which function as recognition signals to other owls.\nHunting and territorial defense are behavioral strategies that ensure the survival of owls as a species, and the perpetuation of the lineages of those who succeed.\nThere are costs to this behavior. Broadcasting your location with repetitive hooting in an exposed position reveals you to predators.\nHooting rhythmically and silent flight demand considerable energy investment, and that energy must derive from successful hunts you are able to complete.\nSurvival relies on a calculation, therefore, in which the energy obtained must surpass the energy consumed.`,
+            `Over the course of the 1950s and 1960s, the Japanese Maritime Agency documented 4,923 reports of unexplained bioluminescent phenomena (UBPs).\nIn 2020, JAMSTEC researchers captured and analyzed video footage of a series of encounters with unidentified luminous organisms that could generate extreme light intensities at unprecedented depths; one researcher reported temporary blindness. There was speculation the organisms were either undiscovered deep-sea species or manifestations of known creatures exhibiting novel behaviors.\nWhen the Japanese Ocean Research Institute (JORI) started deploying deep-sea observation platforms during the 2000s, it recognized a specialized facility was required to investigate and monitor anomalies.\nThe location that was chosen is positioned above an abyssal trench between coordinates 35°N and 142°E in the Pacific Ocean.\nIn reality, concealed from public awareness, it is the access point to the classified underwater laboratory at Station Kuroshio, which became their center, Division 9, for examining the Pacific luminescence.\nWithin 8 months, researchers developed the DS-7 submersible, which could descend to a depth of 36,000 feet.\nAfter a DS-7 was damaged by an unidentified luminous organism in 2021, JORI began developing at Division 9 the pressure-resistant Sphere-12, which could endure encounters at depths exceeding 30,000 feet in 85 seconds at 1,600 miles an hour.\nWith all of the sophisticated photosensitive arrays around Division 9, including bioluminescence detection by the Sphere-12, reports of UBPs diminished.\n"The vessel's light-absorbing coating, dark as the abyss itself, would neutralize photons in a way that could make observers think, emptiness," sources informed marine biologist Yuki Tanaka.\nThe Japanese government formally recognized the existence of Division 9 for the first time in 2022 when JORI released documents about the development of the DS-7 and Sphere-12.\nDivision 9 remains an operational facility-but the purpose it has fulfilled since the 2010s remains a carefully-protected secret, stimulating speculation by oceanography researchers.`
+        ];
+        const questions = [
+            { passageIndex: 0, type: 'Conclusion', text: "What conclusion about quantum computing in drug discovery can be drawn from the passage?", options: ["It has completely replaced classical computational methods in all pharmaceutical research.", "It operates through quantum parallelism exploring multiple molecular configurations simultaneously.", "It requires matching quantum states between drug molecules and target proteins.", "Its success depends exclusively on maintaining absolute zero temperatures."], correctAnswer: "B", explanation: "The passage explicitly states 'The mechanisms enabling this computational advantage involve quantum parallelism-qubits existing in multiple states simultaneously, exploring vast solution spaces...'. This directly supports option B." },
+            { passageIndex: 0, type: 'Inference', text: "According to the passage, the author most likely agrees that quantum pharmacology:", options: ["has established validated protocols for all drug development applications.", "affects drug efficacy solely through electromagnetic interference patterns.", "represents an emerging field investigating quantum biological effects with developing standards.", "necessitates quantum entanglement manipulation in patient treatment."], correctAnswer: "C", explanation: "Option C is correct because the passage describes quantum pharmacology as part of 'the developing field' and states that 'standardized validation frameworks remain under construction,' indicating it's an emerging field with developing standards." },
+            { passageIndex: 0, type: 'Direct Retrieval', text: "Which factors are identified in the passage as pivotal for quantum drug discovery success?", options: ["Molecular weight calculations and patient genetic profiles.", "Coherence time maintenance and error correction protocols.", "Protein folding speeds and chemical reaction rates.", "Electromagnetic frequencies and temperature variations."], correctAnswer: "B", explanation: "The passage explicitly states: 'Two pivotal factors influence quantum drug discovery success: coherence time maintenance, which determines how long quantum states remain stable for calculation, and error correction protocols, which compensate for quantum decoherence effects.'" },
+            { passageIndex: 0, type: 'Direct Retrieval', text: "Which of the following statements is best supported by the information in the passage?", options: ["Quantum computing methods are completely understood and require only temperature control.", "Traditional pharmaceutical research has no continuing role in modern drug development.", "Quantum computing's influence extends from molecular modeling to personalized medicine applications.", "Dilution refrigerators are the sole requirement for successful quantum calculations."], correctAnswer: "C", explanation: "The passage states quantum applications have extended 'beyond small molecule analysis to protein-protein interactions, enzyme catalysis modeling, and even personalized medicine approaches,' clearly supporting that its influence is broad." },
+            { passageIndex: 1, type: 'Direct Retrieval', text: "The most recent increase in urban coyote populations can best be attributed to:", options: ["conservation programs specifically designed to protect coyotes.", "an initiative led by traditional wildlife management agencies.", "habitat restoration completely eliminating human presence.", "adaptive behaviors allowing exploitation of urban resources."], correctAnswer: "D", explanation: "The passage states the population increase 'resulted from animals' rapid behavioral adaptation to human-dominated landscapes,' which directly corresponds to option D." },
+            { passageIndex: 1, type: 'Direct Retrieval', text: "According to the survey, urban coyote populations:", options: ["decreased by 67% compared to 2012 to 2017.", "nearly tripled between 2018 and 2024.", "remained constant during Rodriguez's tenure.", "equaled the 2012 to 2017 baseline."], correctAnswer: "B", explanation: "This is explicitly stated in the first sentence of the passage: 'Urban coyote populations nearly tripled between 2018 and 2024...'" },
+            { passageIndex: 1, type: 'Direct Retrieval', text: "According to the passage, the analysis identified that unfamiliarity with wildlife behavior:", options: ["Dr. Chen, Rodriguez's predecessor as director, successfully addressed through education programs.", "primarily impacts rural communities with established wildlife populations.", "among urban residents contributes to dangerous encounters, especially in developing areas.", "has improved the integration of natural habitats within cities."], correctAnswer: "C", explanation: "The passage states that 'residents unfamiliar with wildlife behavior have become a contributing factor in dangerous encounters, particularly in newly developed suburban areas.'" },
+            { passageIndex: 1, type: 'Inference', text: "Based on information in the passage, it is most likely that the author would agree that:", options: ["Rodriguez's wildlife program was harmful to urban ecological balance.", "urban wildlife adaptation presents both promising opportunities and unresolved challenges.", "liability concerns for wildlife injuries have been comprehensively addressed.", "apex predators will inevitably disappear from metropolitan areas."], correctAnswer: "B", explanation: "The passage presents both positive aspects (decreased property damage, biodiversity improvements, coexistence models) and challenges (dangerous encounters, disease transmission, unaddressed liability), supporting the balanced view in option B." },
+            { passageIndex: 2, type: 'Direct Retrieval', text: "Which of the following coral populations is highlighted in the passage as showing the most significant growth?", options: ["Acropora palmata", "Montastraea cavernosa", "Orbicella faveolata", "Porites astreoides"], correctAnswer: "B", explanation: "The passage states Montastraea cavernosa increased by 'more than 70%.' This is higher than Acropora palmata (60% recovery), Orbicella faveolata (one-half or 50% growth), and Porites astreoides (two-thirds or ~67% increase)." },
+            { passageIndex: 2, type: 'Direct Retrieval', text: "According to the author, the primary driver for increased pH regulation in corals is due to which of the following factors?", options: ["An increase in beneficial symbiotic relationships.", "A reduction in competitive macroalgae species.", "Accelerated evolutionary pressure from acidification.", "Marine biologist intervention programs."], correctAnswer: "C", explanation: "The passage states, 'The observed increase is believed to result from accelerated evolutionary pressure, which triggers genetic expression changes during prolonged acidification exposure.'" },
+            { passageIndex: 2, type: 'Conclusion', text: "Which one of the following statements is best supported by the passage?", options: ["The percentage of pH-regulating corals has more than doubled since 2015.", "There were approximately 46% pH-regulating coral species in 2015.", "Before 2015, scientists had not documented pH regulation abilities.", "Coral species have only recently developed pH regulation."], correctAnswer: "A", explanation: "The passage says the percentage went from 11% in 2015 to 23%. Doubling 11% gives 22%. Since 23% is greater than 22%, the percentage has more than doubled." },
+            { passageIndex: 2, type: 'Conclusion', text: "Which of the following statements about crown-of-thorns starfish is best supported by the information in the passage?", options: ["Their population size enables them to outcompete all coral species.", "Crown-of-thorns have reduced coral genetic diversity significantly.", "There are more starfish than parrotfish on the reefs.", "The growth in starfish populations exceeds that of macroalgae coverage."], correctAnswer: "D", explanation: "The passage states the crown-of-thorns starfish population is expanding at a rate of 380%, while macroalgae coverage has 'tripled' (which is 300%). Therefore, the starfish growth rate (380%) exceeds the macroalgae growth rate (300%)." },
+            { passageIndex: 3, type: 'Direct Retrieval', text: "According to the passage, which of these could not be found in the 1347 Catalog System?", options: ["Reader annotations", "Scribes' names", "Acquisition dates", "Storage locations"], correctAnswer: "A", explanation: "The passage lists the contents of the catalog: 'manuscripts, their scribes' names, materials used and storage locations as well as illuminations, bindings and acquisition dates.' Reader annotations are not mentioned in this list." },
+            { passageIndex: 3, type: 'Direct Retrieval', text: "Which of the following could not be found in the 1298 Scriptorium Fee records?", options: ["Copying service charges", "Individual monks' personal possessions", "Manuscript commission registers", "Production quantities of monastic libraries"], correctAnswer: "B", explanation: "The passage describes the fee records as related to 'manuscript copying services,' 'monastery accounts,' and 'registers of texts commissioned.' It never mentions the personal possessions of individual monks." },
+            { passageIndex: 3, type: 'Conclusion', text: "According to the passage, the 1298 Scriptorium Fee was considered preferable to selling precious metals because:", options: ["monasteries had accumulated more manuscripts than precious metal holdings.", "religious texts were more valuable than gold or silver in medieval markets.", "nobles could exercise feudal claims on metals while manuscript fees were protected.", "calculating fees on copying services was more straightforward than metal valuation."], correctAnswer: "C", explanation: "The passage explicitly states the fee was suggested 'instead of selling precious metals that nobles could claim through feudal rights,' indicating the fees were a way to raise funds that were not subject to these feudal claims." },
+            { passageIndex: 3, type: 'Inference', text: "According to the passage, the most likely reason the 1298 Scriptorium Fee was controversial was because:", options: ["poor monasteries were unable to afford even reduced fee rates.", "charging for religious text reproduction was considered inappropriate.", "merchant guilds lost their monopoly on book trading.", "scribes demanded excessive payments beyond authorized amounts."], correctAnswer: "B", explanation: "The passage directly links the controversy to the nature of the service being charged for: 'Despite the considerable resistance generated by requiring payment for religious text reproduction...'" },
+            { passageIndex: 4, type: 'True/False/CantTell', text: "Spencer's invention of microwave ovens was the result of planned experimental protocols.", options: ["True", "False", "Can't Tell"], correctAnswer: "B", explanation: "The passage describes Spencer's discovery as 'serendipitous' and an 'accident,' noting he 'noticed chocolate melting near magnetron equipment.' This was not a planned experiment." },
+            { passageIndex: 4, type: 'True/False/CantTell', text: "Wilhelm Röntgen received recognition for discovering more than one type of radiation.", options: ["True", "False", "Can't Tell"], correctAnswer: "C", explanation: "The passage only states that Röntgen 'stumbled upon X-rays.' It gives no information about whether he discovered any other types of radiation." },
+            { passageIndex: 4, type: 'True/False/CantTell', text: "Microwave technology produces immediate practical benefits for users.", options: ["True", "False", "Can't Tell"], correctAnswer: "A", explanation: "The passage explicitly states, 'However sophisticated the technology may appear, consumers can experience convenience immediately.'" },
+            { passageIndex: 4, type: 'True/False/CantTell', text: "Spencer tested microwave heating on food products before noticing the chocolate melting.", options: ["True", "False", "Can't Tell"], correctAnswer: "B", explanation: "The passage states Spencer first 'noticed chocolate melting' and then 'realized its heating potential.' The observation of the melting chocolate came before any intentional testing on food." },
+            { passageIndex: 5, type: 'Conclusion', text: "Which of the following statements about CRISPR's synaptic editing system is best supported by the information in the passage?", options: ["It has not demonstrated effectiveness in modifying neural configurations.", "It cannot successfully treat conditions affecting inaccessible brain regions.", "Its targeting mechanisms are too imprecise to alter neurotransmitter function.", "It requires an independent neural population to express its modifications."], correctAnswer: "B", explanation: "The passage states that its 'scope of effectiveness is constrained to neurons accessible via current delivery methods.' This directly implies it cannot treat conditions in inaccessible regions." },
+            { passageIndex: 5, type: 'Conclusion', text: "The author most likely agrees with all of the following statements except:", options: ["neural editor platforms offer superior adaptability over synaptic editing because they can function with or without barrier penetration.", "the synaptic editor and lipid nanoparticle approaches have an advantage over optogenetic controllers because they have undergone practical testing.", "the transferrin receptor, synaptic editor and optogenetic techniques all utilize enzyme-based mechanisms to modify neural function.", "Optogenetic controllers may offer a distinctive benefit over other approaches because they can enhance neural activity through their modifications."], correctAnswer: "C", explanation: "This is the exception. The passage states the synaptic editor uses 'modified enzymes' and optogenetics uses 'light-sensitive channels,' but the second method 'employs lipid nanoparticles engineered with transferrin receptors,' which is not described as an enzyme-based mechanism." },
+            { passageIndex: 5, type: 'Inference', text: "If the information in the passage is presumed to be true, which of the following must also be true?", options: ["The synaptic editor approach is the platform most likely to be implemented because it has undergone preclinical testing.", "A technique employing lipid nanoparticles is least likely to be implemented because it functions without barrier penetration.", "The optogenetic controller approach is least likely to be implemented because it is conceptual and largely theoretical.", "Because all three techniques are currently investigational, it is improbable that any will be implemented by the Consortium."], correctAnswer: "C", explanation: "The passage describes the optogenetic approach as 'largely conceptual' and dependent on 'theoretically' operating channels. Compared to the other two, one of which has undergone preclinical testing and the other has 'demonstrated ability,' the conceptual one is the least likely to be implemented soon." },
+            { passageIndex: 5, type: 'Conclusion', text: "What conclusion can be drawn from the information in the passage?", options: ["Despite the experimental nature of proposed techniques, the Consortium has sufficient confidence to authorize serious investigation into the platforms.", "While restricted by delivery limitations and targeting constraints, existing technology is the sole viable option for modifying neural disorders.", "'Neural editors' are merely a conceptual framework for gene therapy with no basis in actual neuroscience or medical practice.", "The Consortium will need to integrate the synaptic editing platform with any subsequently developed 'optogenetic controller' technology."], correctAnswer: "A", explanation: "The passage says 'authorization has been granted to evaluate the feasibility of three 'neural editor' platforms.' This act of authorization indicates confidence and a commitment to investigating the techniques, despite their experimental status." },
+            { passageIndex: 6, type: 'Direct Retrieval', text: "Based on the information in the passage, it seems that Upernavik Research Station and its location would be of interest to historians for each of the following topics except:", options: ["oceanography.", "climatology.", "geology.", "polar exploration."], correctAnswer: "A", explanation: "The passage mentions climate monitoring (climatology), permafrost boreholes (geology), and Peary's expedition (polar exploration). It does not mention any research related to oceanography." },
+            { passageIndex: 6, type: 'Direct Retrieval', text: "Using information contained in the passage, it can be concluded that James Hansen:", options: ["designed the station and its instruments.", "established Upernavik facility.", "brought researchers to visit the station.", "was impressed by Upernavik's data collection capabilities."], correctAnswer: "D", explanation: "The passage directly states that James Hansen 'praised the unparalleled data quality of its polar location,' which means he was impressed by its data collection capabilities." },
+            { passageIndex: 6, type: 'Direct Retrieval', text: "From the research station, it is possible to see each of the following except:", options: ["the aurora borealis.", "the glacier face.", "the aurora below.", "ice sheet formations."], correctAnswer: "A", explanation: "The passage mentions seeing 'the aurora below' due to the station's high position, but it never explicitly states that the aurora borealis (the northern lights, which are typically seen looking up or across) is visible from the station." },
+            { passageIndex: 6, type: 'Inference', text: "Based on the information in the passage, the feature that the author most values about Upernavik is:", options: ["its scientific contributions.", "its architecture.", "the tundra.", "the remoteness."], correctAnswer: "A", explanation: "The author's focus throughout the passage is on the 'climate monitoring facility,' the 'unparalleled data quality,' and the research. The final paragraph's worried questions ('So what future awaits its measurements, research and contributions?') strongly emphasize the value of its scientific work." },
+            { passageIndex: 7, type: 'Direct Retrieval', text: "Negotiations for credit arrangements involved all of the following parties except:", options: ["guild inspectors.", "civic authorities.", "the banker's house.", "the borrowing merchant."], correctAnswer: "A", explanation: "The passage states that negotiations 'involved bankers and traders but sometimes included the civic authorities.' Guild inspectors are never mentioned as being part of the negotiation process." },
+            { passageIndex: 7, type: 'Direct Retrieval', text: "According to the passage, letters of credit were favored for which of the following reasons?", options: ["Young merchants would be more capable of establishing independent operations.", "The borrower would certainly develop profitable trade connections.", "Established families and partnerships were integrated into commercial networks.", "Trust facilitated international trade through reliable exchange mechanisms."], correctAnswer: "D", explanation: "The passage states, 'Banking houses believed that trust should have everything to do with the fundamental matter of commercial exchange since it would facilitate international trade networks.' This directly supports option D." },
+            { passageIndex: 7, type: 'Direct Retrieval', text: "According to the passage, the 'return' was designed to:", options: ["reimburse civic authorities for administrative oversight.", "compensate merchant associates for payment guarantees during voyages.", "establish a legally enforceable credit instrument.", "repay the banker's house as a fee from the merchant's profits."], correctAnswer: "B", explanation: "The passage says, 'The merchant's associates required the banker guarantee payment settlement for their goods during the journey, with an assured 'return' to compensate them as established traders.'" },
+            { passageIndex: 7, type: 'Direct Retrieval', text: "What segment of the population utilized letters of credit in the 15th century?", options: ["Banking houses", "Civic authorities", "Merchant families", "Maritime traders"], correctAnswer: "C", explanation: "The very first sentence of the passage states: 'Letters of credit were standard for 15th century Italian merchant families.'" },
+            { passageIndex: 8, type: 'Direct Retrieval', text: "According to the passage, all of the major challenges which threatened Antarctica's research programs have now been addressed except:", options: ["the shortage of construction materials.", "the absence of transportation vessels.", "the contamination of pristine sampling sites.", "isolation from international collaboration."], correctAnswer: "C", explanation: "The passage mentions that contamination 'made pristine sampling impossible' and that it remains a primary concern ('ice core archives have become the researchers' primary concern...now threatened'). While a clean technology program was established, the problem of existing contamination and the threat to remaining pristine sites is presented as an ongoing issue." },
+            { passageIndex: 8, type: 'Direct Retrieval', text: "According to the writer, which of the following occurred before research restrictions were strengthened?", options: ["Glaciological studies had been initiated.", "A clean technology program had been established near research sites.", "The continent's ecosystems had experienced unintended impacts.", "Antarctica had received stringent protection standards."], correctAnswer: "C", explanation: "The passage states that 'Until environmental restrictions were strengthened in 2012,' researchers discovered 'they had inadvertently impacted local ecosystems.' This clearly places the impact before the strengthening of restrictions." },
+            { passageIndex: 8, type: 'Inference', text: "From the information in the passage, which of the following would most substantially reduce the number of temporary researchers in Antarctica?", options: ["The closure of the airstrip network", "The completion of glaciological studies", "The expansion of the scientific community", "The preservation of ice core archives"], correctAnswer: "A", explanation: "The passage states that the network of airstrips and research vessels 'accommodates approximately 5,000 researchers annually.' Closing this network would directly and substantially cut off the primary means of access for these researchers." },
+            { passageIndex: 8, type: 'Conclusion', text: "What types of specialists would ATCM have been most likely to deploy to Antarctica to investigate the features in which the organization is now most interested?", options: ["Climatologists and biologists", "Climatologists and archivists", "Marine ecologists and archivists", "Marine ecologists and geologists"], correctAnswer: "B", explanation: "The passage states the 'primary concern' is now the 'Antarctica's ice core archives' which represent an 'irreplaceable climate record.' This requires specialists in climate (climatologists) and the preservation of records (archivists)." },
+            { passageIndex: 9, type: 'True/False/CantTell', text: "The size of an owl pair's territory depends on the abundance of prey species within it.", options: ["True", "False", "Can't Tell"], correctAnswer: "A", explanation: "The passage directly states, 'When prey is plentiful, the territory can be more compact than in scarce years.' This confirms that the territory size is dependent on prey abundance." },
+            { passageIndex: 9, type: 'True/False/CantTell', text: "Female owls do not engage in hunting activities during daylight hours.", options: ["True", "False", "Can't Tell"], correctAnswer: "C", explanation: "The passage describes the 'silent hunt' in 'darkness' and winter hunting, but it does not provide any information to confirm or deny whether female owls also hunt during the day. We can't tell." },
+            { passageIndex: 9, type: 'True/False/CantTell', text: "When prey is scarce, owls do not hoot.", options: ["True", "False", "Can't Tell"], correctAnswer: "B", explanation: "The passage states that hooting is for 'announcing the pair's ownership' and warning rivals. This territorial defense would be even more critical when prey is scarce to protect limited food resources. Therefore, it's false to assume they would stop hooting." },
+            { passageIndex: 9, type: 'True/False/CantTell', text: "Owls are territorial toward all other nocturnal predators.", options: ["True", "False", "Can't Tell"], correctAnswer: "C", explanation: "The passage mentions that the female's hooting is for 'warning rival owls.' It does not provide any information about their behavior towards other types of nocturnal predators (e.g., foxes, weasels). We can't tell." },
+            { passageIndex: 10, type: 'Direct Retrieval', text: "Station Kuroshio, Pacific Ocean, was chosen as a location by JORI to investigate and monitor anomalies because:", options: ["marine biologists would be enthusiastic to conduct research there.", "it was hidden, strategically located and infrequently accessed.", "the Maritime Agency documented many UBPs were observed there.", "it could be readily accessed from the Japanese mainland."], correctAnswer: "B", explanation: "The passage states the facility is 'concealed from public awareness' and positioned over an 'abyssal trench.' This points to it being chosen for its hidden, strategic nature, not public enthusiasm or ease of access." },
+            { passageIndex: 10, type: 'Conclusion', text: "When the Japanese government recognized the existence of Division 9 in 2022, it:", options: ["validated the concerns of people living near the facility.", "was questioned about its expenditure on the DS-7 and Sphere-12 submersibles.", "stated the monitoring activities at Station Kuroshio had advanced ocean research.", "resulted in additional speculation about the present purposes of the facility."], correctAnswer: "D", explanation: "The passage concludes by stating that even after the official recognition, the facility's purpose 'remains a carefully-protected secret, stimulating speculation by oceanography researchers.'" },
+            { passageIndex: 10, type: 'Inference', text: "According to the passage, what is the best explanation for the reduced reports of UBP sightings around Division 9?", options: ["Increased monitoring by international navies during the 2010s", "Greater interest in space shown by those monitoring anomalies", "People observing encounters of classified submersibles from Station Kuroshio", "Implementation of photosensitive technology for research purposes"], correctAnswer: "D", explanation: "The passage explicitly connects the two events: 'With all of the sophisticated photosensitive arrays around Division 9, including bioluminescence detection by the Sphere-12, reports of UBPs diminished.' This implies the technology itself was related to the reduced sightings, perhaps by either solving the mystery or being misidentified as the phenomena." },
+            { passageIndex: 10, type: 'Direct Retrieval', text: "Some observations of possible UBPs have mentioned unusual characteristics involving:", options: ["extraordinary pressure resistance.", "extreme depths and light intensity.", "enormous biomass concentrations.", "electromagnetic pulse emissions."], correctAnswer: "B", explanation: "The passage mentions encounters with 'unidentified luminous organisms that could generate extreme light intensities at unprecedented depths,' directly matching the characteristics in option B." }
+        ];
+
+        let currentQuestionIndex = 0;
+        let userAnswers = new Array(questions.length).fill(null);
+        let timerInterval;
+        let timeLeft = 22 * 60;
+        let examStartTime;
+        let examEndTime;
+        let userName = '';
+        let userGoal = '';
+        let userFocusArea = '';
+        let isReviewingFromResults = false;
+        let questionStartTime = null;
+        let questionTimes = new Array(questions.length).fill(0);
+        let flaggedQuestions = new Array(questions.length).fill(false);
+        let isFilteringFlagged = false;
+        let currentlyDisplayedPassageIndex = -1;
+        let currentFontSize = 1.0;
+
+        // --- Elements & Functions ---
+        const appContainer = document.getElementById('app-container');
+        const setupScreen = document.getElementById('setup-screen');
+        const examScreen = document.getElementById('exam-screen');
+        const reviewScreen = document.getElementById('review-screen');
+        const resultsScreen = document.getElementById('results-screen');
+        const navigatorModal = document.getElementById('navigator-modal');
+        const startButton = document.getElementById('start-button');
+        const prevButton = document.getElementById('prev-button');
+        const nextButton = document.getElementById('next-button');
+        const navigatorButton = document.getElementById('navigator-button');
+        const closeModalButton = document.getElementById('close-modal-button');
+        const endExamButton = document.getElementById('end-exam-button');
+        const endExamButtonFooter = document.getElementById('end-exam-button-footer');
+        const backToResultsButton = document.getElementById('back-to-results-button');
+        const flagButton = document.getElementById('flag-button');
+        const passageNumberEl = document.getElementById('passage-number');
+        const passageTextEl = document.getElementById('passage-text');
+        const questionNumberEl = document.getElementById('question-number');
+        const questionNumberInfoEl = document.getElementById('question-number-info');
+        const questionTextEl = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const timerEl = document.getElementById('timer');
+        const reviewGrid = document.getElementById('review-grid');
+        const navigatorGrid = document.getElementById('navigator-grid');
+        const scoreEl = document.getElementById('score');
+        const totalQuestionsResultsEl = document.getElementById('total-questions-results');
+        const timeTakenEl = document.getElementById('time-taken');
+        const resultsGridContainer = document.getElementById('results-grid-container');
+        const nameInput = document.getElementById('name');
+        const goalInput = document.getElementById('goal');
+        const focusAreaInput = document.getElementById('focus-area');
+        const examTitleEl = document.getElementById('exam-title');
+        const filterFlaggedButton = document.getElementById('filter-flagged-button');
+        const setupQuestionCountEl = document.getElementById('setup-question-count');
+        const setupTimeLimitEl = document.getElementById('setup-time-limit');
+        const reviewExplanationContainer = document.getElementById('review-explanation-container');
+        const downloadPdfButton = document.getElementById('download-pdf-button');
+        const fontDecreaseButton = document.getElementById('font-decrease-button');
+        const fontIncreaseButton = document.getElementById('font-increase-button');
+        const resizableTextElements = document.querySelectorAll('.resizable-text');
+        const timeAnalysisResultsEl = document.getElementById('time-analysis-results');
+        const typeAnalysisResultsEl = document.getElementById('type-analysis-results');
+
+        function startTimer() { examStartTime = new Date(); clearInterval(timerInterval); timerEl.textContent = formatTimeSeconds(timeLeft); timerInterval = setInterval(() => { timeLeft--; timerEl.textContent = formatTimeSeconds(timeLeft); if (timeLeft <= 0) { endExamAndShowResults(); } }, 1000); }
+        function stopTimer() { clearInterval(timerInterval); examEndTime = examEndTime || new Date(); }
+        function formatTimeSeconds(totalSeconds) { if (totalSeconds < 0) totalSeconds = 0; const minutes = Math.floor(totalSeconds / 60); const seconds = totalSeconds % 60; return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`; }
+        function formatTimeMilliseconds(milliseconds) { if (!milliseconds || milliseconds < 0) return "0s"; return `${(milliseconds / 1000).toFixed(1)}s`; }
+        function formatTimeDifference(milliseconds) { if (!milliseconds || milliseconds < 0) return "0 min 00 sec"; const totalSeconds = Math.round(milliseconds / 1000); const minutes = Math.floor(totalSeconds / 60); const seconds = totalSeconds % 60; return `${minutes} min ${seconds < 10 ? '0' : ''}${seconds} sec`; }
+        function recordTimeSpent(index) { if (questionStartTime && index >= 0 && index < questions.length) { questionTimes[index] = (questionTimes[index] || 0) + (Date.now() - questionStartTime); } questionStartTime = null; }
+        function toggleFlag() { if (isReviewingFromResults) return; flaggedQuestions[currentQuestionIndex] = !flaggedQuestions[currentQuestionIndex]; updateFlagButtonAppearance(); updateNavigatorButtons(); }
+        function updateFlagButtonAppearance() { const isFlagged = flaggedQuestions[currentQuestionIndex]; flagButton.textContent = isFlagged ? 'Unflag' : 'Flag for Review'; flagButton.classList.toggle('flagged', isFlagged); }
+        function updateFontSize() { resizableTextElements.forEach(el => { el.querySelectorAll('#passage-text, #question-text, .option-label').forEach(child => { child.style.fontSize = `${currentFontSize}rem`; }); }); }
+        function loadQuestion(index, reviewMode = false) { if (index < 0 || index >= questions.length) return; if (!isReviewingFromResults && !reviewMode) { recordTimeSpent(currentQuestionIndex); } const question = questions[index]; const newPassageIndex = question.passageIndex; if (newPassageIndex !== currentlyDisplayedPassageIndex || reviewMode) { passageTextEl.innerHTML = passages[newPassageIndex].replace(/\n/g, '<br><br>'); passageNumberEl.textContent = newPassageIndex + 1; currentlyDisplayedPassageIndex = newPassageIndex; document.querySelector('.passage-column').scrollTop = 0; } currentQuestionIndex = index; isReviewingFromResults = reviewMode; questionNumberEl.textContent = index + 1; questionNumberInfoEl.textContent = `${index + 1} of ${questions.length}`; questionTextEl.textContent = question.text; document.querySelector('.question-column').scrollTop = 0; optionsContainer.innerHTML = ''; reviewExplanationContainer.innerHTML = ''; const optionLetters = question.options.length === 3 ? ['A', 'B', 'C'] : ['A', 'B', 'C', 'D']; question.options.forEach((option, i) => { const optionId = `q${index}_opt${i}`; const label = document.createElement('label'); label.htmlFor = optionId; label.className = 'option-label'; label.dataset.optionIndex = i; const radio = document.createElement('input'); radio.type = 'radio'; radio.id = optionId; radio.name = `question_${index}`; radio.value = optionLetters[i]; radio.disabled = reviewMode; label.style.cursor = reviewMode ? 'default' : 'pointer'; if (userAnswers[index] === optionLetters[i]) { radio.checked = true; label.classList.add('selected-answer'); } if (reviewMode) { const isCorrectAnswer = question.correctAnswer === optionLetters[i]; const isSelectedAnswer = userAnswers[index] === optionLetters[i]; if (isCorrectAnswer) { label.classList.add('border-green-500', 'border-2', 'bg-green-50'); } else if (isSelectedAnswer) { label.classList.add('border-red-500', 'border-2', 'bg-red-50'); } } label.appendChild(radio); label.appendChild(document.createTextNode(question.type === 'True/False/CantTell' ? ` ${option}` : ` ${optionLetters[i]}) ${option}`)); if (!reviewMode) { label.addEventListener('click', () => handleOptionSelect(index, i, optionLetters[i])); radio.addEventListener('change', () => handleOptionSelect(index, i, optionLetters[i])); } optionsContainer.appendChild(label); }); if (reviewMode && question.explanation) { const explanationDiv = document.createElement('div'); explanationDiv.className = 'explanation-box'; explanationDiv.innerHTML = `<strong class="font-semibold">Explanation:</strong><br>${question.explanation.replace(/\n/g, '<br>')}`; reviewExplanationContainer.appendChild(explanationDiv); } prevButton.disabled = index === 0; nextButton.textContent = (!reviewMode && index === questions.length - 1) ? 'Finish & Review' : 'Next (Alt+N) →'; if(reviewMode) nextButton.disabled = index === questions.length - 1; updateFlagButtonAppearance(); backToResultsButton.classList.toggle('hidden', !reviewMode); endExamButtonFooter.classList.toggle('hidden', reviewMode); examTitleEl.textContent = reviewMode ? "Reviewing Question" : "Verbal Reasoning"; flagButton.disabled = reviewMode; updateNavigatorHighlight(); updateFontSize(); if (!isReviewingFromResults) { questionStartTime = Date.now(); } }
+        function handleOptionSelect(questionIndex, optionIndex, optionValue) { if (questionIndex !== currentQuestionIndex || isReviewingFromResults) return; userAnswers[questionIndex] = optionValue; document.querySelectorAll(`#options-container .option-label`).forEach(lbl => lbl.classList.remove('selected-answer')); const selectedLabel = document.querySelector(`#options-container label[for="q${questionIndex}_opt${optionIndex}"]`); if (selectedLabel) { selectedLabel.classList.add('selected-answer'); selectedLabel.querySelector('input[type="radio"]').checked = true; } updateNavigatorButtons(); }
+        function showNextQuestion() { const reviewMode = isReviewingFromResults; const nextIndex = currentQuestionIndex + 1; if (nextIndex < questions.length) { loadQuestion(nextIndex, reviewMode); } else if (!reviewMode) { recordTimeSpent(currentQuestionIndex); stopTimer(); showReviewScreen(); } }
+        function showPrevQuestion() { if (currentQuestionIndex > 0) { loadQuestion(currentQuestionIndex - 1, isReviewingFromResults); } }
+        function showScreen(screenToShow) { [setupScreen, examScreen, reviewScreen, resultsScreen].forEach(screen => { screen.classList.add('hidden'); screen.classList.remove('flex'); }); screenToShow.classList.remove('hidden'); if (screenToShow !== examScreen) appContainer.classList.remove('!border-none', '!shadow-none', '!m-0', '!rounded-none'); else appContainer.classList.add('!border-none', '!shadow-none', '!m-0', '!rounded-none'); if (screenToShow === setupScreen || screenToShow === resultsScreen) { screenToShow.classList.add('flex'); } }
+        function showReviewScreen(filterFlagged = false) { recordTimeSpent(currentQuestionIndex); stopTimer(); showScreen(reviewScreen); reviewScreen.classList.add('flex'); reviewGrid.innerHTML = ''; questions.forEach((_, index) => { if (filterFlagged && !flaggedQuestions[index]) return; const button = document.createElement('button'); button.textContent = index + 1; button.className = 'review-grid-button'; button.classList.toggle('review-grid-button-answered', userAnswers[index] !== null); button.classList.toggle('review-grid-button-unanswered', userAnswers[index] === null); if (flaggedQuestions[index]) button.classList.add('review-flagged'); button.onclick = () => { showScreen(examScreen); examScreen.classList.add('flex'); loadQuestion(index); startTimer(); }; reviewGrid.appendChild(button); }); filterFlaggedButton.textContent = filterFlagged ? 'Show All Questions' : 'Show Flagged Only'; }
+        function populateNavigator() { navigatorGrid.innerHTML = ''; questions.forEach((_, index) => { const button = document.createElement('button'); button.textContent = index + 1; button.className = 'py-2 px-1 border border-gray-300 rounded-md text-center transition duration-150 ease-in-out text-sm hover:bg-gray-100'; button.dataset.questionIndex = index; if (userAnswers[index]) button.classList.add('nav-answered'); if (index === currentQuestionIndex) button.classList.add('nav-current'); if (flaggedQuestions[index]) button.classList.add('nav-flagged'); button.onclick = () => { navigatorModal.classList.remove('flex'); loadQuestion(parseInt(button.dataset.questionIndex, 10), isReviewingFromResults); if (!isReviewingFromResults) questionStartTime = Date.now(); }; navigatorGrid.appendChild(button); }); }
+        function updateNavigatorButtons() { navigatorGrid.querySelectorAll('button').forEach(button => { const index = parseInt(button.dataset.questionIndex, 10); button.classList.toggle('nav-answered', !!userAnswers[index]); button.classList.toggle('nav-current', index === currentQuestionIndex); button.classList.toggle('nav-flagged', flaggedQuestions[index]); }); }
+        function updateNavigatorHighlight() { navigatorGrid.querySelectorAll('button').forEach(button => { button.classList.toggle('nav-current', parseInt(button.dataset.questionIndex, 10) === currentQuestionIndex); }); }
+        function analyzeAndDisplayPerformance() { let correctTimeTotal = 0, correctCount = 0, incorrectTimeTotal = 0, incorrectCount = 0; const typeStats = {}; questions.forEach((q, i) => { const isCorrect = userAnswers[i] === q.correctAnswer; if (userAnswers[i] !== null) { (isCorrect ? (correctTimeTotal += questionTimes[i], correctCount++) : (incorrectTimeTotal += questionTimes[i], incorrectCount++)); } const qType = q.type || 'Uncategorized'; if (!typeStats[qType]) typeStats[qType] = { correct: 0, total: 0 }; typeStats[qType].total++; if(isCorrect) typeStats[qType].correct++; }); timeAnalysisResultsEl.innerHTML = `<p class="flex justify-between"><span>Avg. time (Correct):</span> <span class="font-bold text-green-600">${correctCount > 0 ? formatTimeMilliseconds(correctTimeTotal / correctCount) : 'N/A'}</span></p><p class="flex justify-between"><span>Avg. time (Incorrect):</span> <span class="font-bold text-red-600">${incorrectCount > 0 ? formatTimeMilliseconds(incorrectTimeTotal / incorrectCount) : 'N/A'}</span></p>`; typeAnalysisResultsEl.innerHTML = ''; Object.keys(typeStats).sort().forEach(type => { const stats = typeStats[type]; const percentage = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0; typeAnalysisResultsEl.innerHTML += `<p class="flex justify-between"><span>${type}:</span> <span class="font-bold">${stats.correct}/${stats.total} (${percentage}%)</span></p>`; }); }
+        function showResultsScreen() { examEndTime = examEndTime || new Date(); recordTimeSpent(currentQuestionIndex); stopTimer(); showScreen(resultsScreen); let score = 0; resultsGridContainer.innerHTML = ''; questions.forEach((qData, index) => { const isCorrect = userAnswers[index] === qData.correctAnswer; if (isCorrect) score++; const container = document.createElement('div'); const resultBox = document.createElement('div'); resultBox.className = 'result-box'; resultBox.classList.add(isCorrect ? 'result-box-correct' : 'result-box-incorrect'); if (flaggedQuestions[index]) resultBox.classList.add('result-box-flagged'); resultBox.title = `Click to review Question ${index + 1}`; const timeDiv = document.createElement('div'); timeDiv.className = 'time-spent'; timeDiv.textContent = `${Math.round((questionTimes[index] || 0) / 1000)}s`; resultBox.appendChild(timeDiv); container.appendChild(resultBox); const qNumDiv = document.createElement('div'); qNumDiv.className = 'question-num-label'; qNumDiv.textContent = `Q${index + 1}`; container.appendChild(qNumDiv); container.addEventListener('click', () => revisitQuestionFromResults(index)); resultsGridContainer.appendChild(container); }); scoreEl.textContent = score; totalQuestionsResultsEl.textContent = questions.length; timeTakenEl.textContent = formatTimeDifference(examEndTime - examStartTime); analyzeAndDisplayPerformance(); }
+        function revisitQuestionFromResults(index) { showScreen(examScreen); examScreen.classList.add('flex'); loadQuestion(index, true); }
+        function endExamAndShowResults() { stopTimer(); showResultsScreen(); }
+        function generatePDF() { const { jsPDF } = window.jspdf; const doc = new jsPDF(); let y = 15; const lineHeight = 7; const margin = 15; const pageWidth = doc.internal.pageSize.width; doc.setFontSize(18); doc.text("UCAT Verbal Reasoning Results", pageWidth / 2, y, { align: 'center' }); y += lineHeight * 2; doc.setFontSize(12); const summaryData = [ ["Name:", userName || 'N/A'], ["Goal:", `${userGoal || 'N/A'} / ${questions.length}`], ["Focus Area:", userFocusArea || 'N/A'], ["Final Score:", `${scoreEl.textContent} / ${questions.length}`], ["Time Taken:", timeTakenEl.textContent] ]; summaryData.forEach(row => { doc.setFont(undefined, 'bold'); doc.text(row[0], margin, y); doc.setFont(undefined, 'normal'); doc.text(row[1], margin + 40, y); y += lineHeight; }); y += lineHeight; doc.save(`ucat_vr_results_${userName.replace(/\s+/g, '_') || 'user'}.pdf`); }
+        
+        // --- Event Listeners ---
+        startButton.addEventListener('click', () => { userName = nameInput.value.trim(); userGoal = goalInput.value.trim(); userFocusArea = focusAreaInput.value.trim(); timeLeft = 22 * 60; showScreen(examScreen); examScreen.classList.add('flex'); startTimer(); loadQuestion(0); populateNavigator(); });
+        nextButton.addEventListener('click', showNextQuestion);
+        prevButton.addEventListener('click', showPrevQuestion);
+        endExamButton.addEventListener('click', endExamAndShowResults);
+        endExamButtonFooter.addEventListener('click', () => { recordTimeSpent(currentQuestionIndex); stopTimer(); showReviewScreen(); });
+        backToResultsButton.addEventListener('click', () => { isReviewingFromResults = false; showResultsScreen(); });
+        navigatorButton.addEventListener('click', () => { recordTimeSpent(currentQuestionIndex); updateNavigatorButtons(); navigatorModal.classList.add('flex'); });
+        closeModalButton.addEventListener('click', () => { navigatorModal.classList.remove('flex'); if (!isReviewingFromResults) questionStartTime = Date.now(); });
+        navigatorModal.addEventListener('click', (event) => { if (event.target === navigatorModal) closeModalButton.click(); });
+        flagButton.addEventListener('click', toggleFlag);
+        filterFlaggedButton.addEventListener('click', () => { isFilteringFlagged = !isFilteringFlagged; showReviewScreen(isFilteringFlagged); });
+        downloadPdfButton.addEventListener('click', generatePDF);
+        fontIncreaseButton.addEventListener('click', () => { if(currentFontSize < 1.5) { currentFontSize += 0.1; updateFontSize(); } });
+        fontDecreaseButton.addEventListener('click', () => { if (currentFontSize > 0.8) { currentFontSize -= 0.1; updateFontSize(); } });
+
+        document.addEventListener('keydown', (e) => {
+             const isExamVisible = !examScreen.classList.contains('hidden');
+             const isModalVisible = navigatorModal.classList.contains('flex');
+             const isInputFocused = document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+             if (isModalVisible || isInputFocused || !isExamVisible) return;
+             if (e.altKey) {
+                 if (e.code.toLowerCase() === 'keyn') { e.preventDefault(); if (!nextButton.disabled) nextButton.click(); }
+                 if (e.code.toLowerCase() === 'keyp') { e.preventDefault(); if (!prevButton.disabled) prevButton.click(); }
+                 if (e.code.toLowerCase() === 'keyf') { e.preventDefault(); if (!isReviewingFromResults && !flagButton.disabled) flagButton.click(); }
+             } else if (['a', 'b', 'c', 'd'].includes(e.key.toLowerCase()) && !isReviewingFromResults) {
+                 e.preventDefault();
+                 const optionIndex = ['a', 'b', 'c', 'd'].indexOf(e.key.toLowerCase());
+                 if (optionIndex < questions[currentQuestionIndex].options.length) {
+                     handleOptionSelect(currentQuestionIndex, optionIndex, ['A', 'B', 'C', 'D'][optionIndex]);
+                 }
+             }
+        });
+
+        // --- Initial Load ---
+        showScreen(setupScreen);
+        updateFontSize();
+
+    </script>
+</body>
+</html>
